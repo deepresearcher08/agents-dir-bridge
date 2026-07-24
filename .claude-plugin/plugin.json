@@ -1,0 +1,17 @@
+{
+  "name": "agents-dir-bridge",
+  "version": "0.1.0",
+  "description": "bridges the community .agents/ shared directory + manifest convention (see anthropics/claude-code#80801) into claude code's native .claude/ discovery, with zero core changes.",
+  "author": {
+    "name": "Deep"
+  },
+  "repository": "https://github.com/deepresearcher08/agents-dir-bridge",
+  "license": "MIT",
+  "keywords": [
+    "agents-dir",
+    "interop",
+    "multi-agent",
+    "discovery",
+    "hooks"
+  ]
+}

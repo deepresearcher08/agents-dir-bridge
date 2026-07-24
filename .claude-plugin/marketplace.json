@@ -1,0 +1,13 @@
+{
+  "name": "agents-dir-bridge-marketplace",
+  "owner": {
+    "name": "deep"
+  },
+  "plugins": [
+    {
+      "name": "agents-dir-bridge",
+      "source": "./",
+      "description": "bridges the community .agents/ directory + manifest convention into Claude Code's native discovery paths."
+    }
+  ]
+}
