@@ -34,6 +34,13 @@ const RESOURCE_TARGETS = {
 const STATE_FILE = ".claude/.agents-dir-bridge-state.json";
 const MANIFEST_CANDIDATES = ["manifest.json", "manifest.yaml", "manifest.yml"];
 
+// Claude Code has no native "prompts" discovery directory (unlike skills,
+// commands, agents), so declared prompts can't be symlinked into a native
+// spot. Instead their content is read and injected directly as
+// additionalContext at SessionStart — effectively a dynamic, project-defined
+// CLAUDE.md fragment. Capped to keep session bootstrap cheap.
+const PROMPTS_MAX_CHARS = 6000;
+
 function readStdin() {
   try {
     const data = fs.readFileSync(0, "utf8");
@@ -117,6 +124,10 @@ function fallbackDeclaration(agentsDir) {
     if (fs.existsSync(candidate)) {
       declared[type] = [path.relative(agentsDir, candidate)];
     }
+  }
+  const promptsCandidate = path.join(claudeAgentDir, "prompts");
+  if (fs.existsSync(promptsCandidate)) {
+    declared.prompts = [path.relative(agentsDir, promptsCandidate)];
   }
   return declared;
 }
@@ -241,6 +252,57 @@ function linkSingleFile(root, sourceFile, targetRel, state, newLinks, summary, l
   summary.push(`${label}: linked ${path.relative(root, sourceFile)}`);
 }
 
+/**
+ * Reads declared prompt sources (files or directories of files) and
+ * concatenates their contents into one context block, capped at
+ * PROMPTS_MAX_CHARS. Returns { text, fileCount } — text is "" if nothing
+ * was found or readable.
+ */
+function collectPrompts(root, agentsDir, declaredPaths) {
+  const files = [];
+  for (const p of declaredPaths) {
+    const srcAbs = resolveDeclaredPath(root, agentsDir, p);
+    if (!fs.existsSync(srcAbs)) {
+      log(`declared prompts path missing: ${p}`);
+      continue;
+    }
+    const st = fs.statSync(srcAbs);
+    if (st.isDirectory()) {
+      const entries = fs
+        .readdirSync(srcAbs)
+        .filter((e) => fs.statSync(path.join(srcAbs, e)).isFile())
+        .sort();
+      for (const entry of entries) files.push(path.join(srcAbs, entry));
+    } else if (st.isFile()) {
+      files.push(srcAbs);
+    }
+  }
+
+  if (!files.length) return { text: "", fileCount: 0 };
+
+  let combined = "";
+  let truncated = false;
+  for (const file of files) {
+    let content;
+    try {
+      content = fs.readFileSync(file, "utf8");
+    } catch (e) {
+      log(`could not read prompt file ${file}: ${e.message}`);
+      continue;
+    }
+    const section = `### ${path.relative(root, file)}\n\n${content.trim()}\n\n`;
+    if (combined.length + section.length > PROMPTS_MAX_CHARS) {
+      truncated = true;
+      break;
+    }
+    combined += section;
+  }
+  if (truncated) {
+    combined += `_(truncated at ${PROMPTS_MAX_CHARS} chars — see .agents/ prompt files directly for the rest)_\n`;
+  }
+  return { text: combined.trim(), fileCount: files.length };
+}
+
 function main() {
   const input = readStdin();
   const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
@@ -287,8 +349,21 @@ function main() {
   state.links = Array.from(newLinks).map((dest) => ({ dest }));
   saveState(root, state);
 
-  if (summary.length) {
-    const context = `.agents/ bridge active (via agents-dir-bridge plugin, see anthropics/claude-code#80801): ${summary.join("; ")}.`;
+  // Prompts have no native discovery directory, so they're injected as
+  // context rather than symlinked — see collectPrompts() docblock.
+  let promptsBlock = "";
+  const promptsDeclared = declared.prompts;
+  if (promptsDeclared && promptsDeclared.length) {
+    const { text, fileCount } = collectPrompts(root, agentsDir, promptsDeclared);
+    if (fileCount > 0) summary.push(`prompts: ${fileCount} file(s) injected into context`);
+    promptsBlock = text;
+  }
+
+  if (summary.length || promptsBlock) {
+    let context = `.agents/ bridge active (via agents-dir-bridge plugin, see anthropics/claude-code#80801): ${summary.join("; ")}.`;
+    if (promptsBlock) {
+      context += `\n\n---\nProject prompts from .agents/:\n\n${promptsBlock}`;
+    }
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
