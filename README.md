@@ -1,5 +1,9 @@
 # agents-dir-bridge
 
+[![npm version](https://img.shields.io/npm/v/@deepresearcher08/agents-dir-bridge.svg)](https://www.npmjs.com/package/@deepresearcher08/agents-dir-bridge)
+[![npm downloads](https://img.shields.io/npm/dt/@deepresearcher08/agents-dir-bridge.svg)](https://www.npmjs.com/package/@deepresearcher08/agents-dir-bridge)
+[![license](https://img.shields.io/npm/l/@deepresearcher08/agents-dir-bridge.svg)](./LICENSE)
+
 A Claude Code plugin implementing [anthropics/claude-code#80801](https://github.com/anthropics/claude-code/issues/80801):
 
 > Support a shared `.agents/` directory and manifest-based discovery, instead of every
@@ -10,6 +14,8 @@ and root `.mcp.json`. Changing that is a core-team decision. This plugin doesn't
 it bridges the gap entirely from plugin-space, using a `SessionStart` hook, so a repo can adopt
 the `.agents/` convention **today**, fully backward compatible, with **zero changes to Claude Code
 itself**.
+
+Published on npm as [`@deepresearcher08/agents-dir-bridge`](https://www.npmjs.com/package/@deepresearcher08/agents-dir-bridge).
 
 ## What it does
 
@@ -47,6 +53,8 @@ On every session start (and on demand via `/agents-sync`), the plugin:
 
 ## Install
 
+### Via Claude Code plugin marketplace (recommended)
+
 ```
 /plugin marketplace add deepresearcher08/agents-dir-bridge
 /plugin install agents-dir-bridge@agents-dir-bridge-marketplace
@@ -57,6 +65,26 @@ Or locally, for testing:
 ```
 /plugin install ./agents-dir-bridge
 ```
+
+### Via npm
+
+The plugin is also published to npm, mainly so it can be pulled in as a dependency of another
+tool, inspected before installing, or pinned to an exact version:
+
+```
+npm install @deepresearcher08/agents-dir-bridge
+```
+
+```
+npm view @deepresearcher08/agents-dir-bridge
+```
+
+Package page: <https://www.npmjs.com/package/@deepresearcher08/agents-dir-bridge>
+
+> npm install alone does **not** register the Claude Code plugin/hook — use the
+> `/plugin marketplace add` + `/plugin install` commands above for that. The npm package mirrors
+> the same files (`scripts/`, `hooks/`, `commands/`, `.claude-plugin/`) for programmatic use,
+> inspection, or vendoring into another project.
 
 ## Manual re-sync
 
@@ -84,3 +112,28 @@ exact manifest shape and discovery behavior a native implementation could adopt.
   more thought than a symlink can offer.
 - The YAML parser here only supports the flat `key: \n  - value` shape from the issue's example,
   not full YAML. Projects needing more structure should use `manifest.json`.
+
+## Changelog
+
+### 1.0.1
+
+- **Fixed:** `package.json` incorrectly declared `"type": "module"` while
+  `scripts/sync-agents-dir.js` is written in CommonJS (`require`). This caused the hook to crash
+  with `ReferenceError: require is not defined in ES module scope` on **every** session start —
+  even when no `.agents/` directory was present, since the crash happened before the no-op check
+  ran. The plugin did not function at all in `1.0.0`.
+- Removed `"type": "module"` from `package.json` to resolve the crash.
+
+### 1.0.0
+
+- Initial release.
+
+## Contributing
+
+Issues and PRs welcome — especially discussion on the limitations above, since the goal is
+to keep this useful as a reference implementation for
+[anthropics/claude-code#80801](https://github.com/anthropics/claude-code/issues/80801).
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
